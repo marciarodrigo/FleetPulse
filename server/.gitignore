@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+*.local
+
+# Local MongoDB data directory
+data/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor & OS
+.DS_Store
+.vscode/
+.idea/
