@@ -1,6 +1,17 @@
-const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-).replace(/\/$/, "");
+const getApiBaseUrl = () => {
+  // If explicitly configured via VITE_API_URL environment variable
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // In production (Vercel deployment: relative path /api for same-origin serverless routing)
+  if (import.meta.env.PROD) {
+    return "/api";
+  }
+  // In local development: default to Express server on port 5000
+  return "http://localhost:5000/api";
+};
+
+const API_BASE_URL = getApiBaseUrl().replace(/\/$/, "");
 
 const request = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -22,6 +33,7 @@ const request = async (endpoint, options = {}) => {
     config.body = JSON.stringify(config.body);
   }
 
+  
   let response;
   try {
     response = await fetch(url, config);

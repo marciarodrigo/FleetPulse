@@ -59,10 +59,29 @@ const ensureLocalMongoRunning = async () => {
 };
 
 const connectDB = async () => {
+  // If already connected (e.g. reused serverless lambda container), return immediately
+  if (mongoose.connection.readyState >= 1) {
+    return;
+  }
+
   const primaryURI =
     process.env.MONGODB_URI ||
     process.env.MONGO_URI ||
     "mongodb://127.0.0.1:27017/fleetpulse";
+
+  // In Vercel serverless environment, directly connect to cloud MongoDB
+  if (process.env.VERCEL) {
+    try {
+      await mongoose.connect(primaryURI, {
+        serverSelectionTimeoutMS: 5000
+      });
+      console.log("MongoDB connected successfully (Vercel Serverless)");
+      return;
+    } catch (vercelErr) {
+      console.error("MongoDB Atlas connection failed on Vercel:", vercelErr.message);
+      throw vercelErr;
+    }
+  }
 
   // Try primary URI
   try {

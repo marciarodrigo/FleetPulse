@@ -27,4 +27,5 @@ yarn-debug.log*
 .idea/
 Thumbs.db
 *.zip
+.vercel/
 

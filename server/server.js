@@ -46,6 +46,11 @@ app.use(
         return callback(null, true);
       }
 
+      // Allow all Vercel deployments (*.vercel.app)
+      if (/^https:\/\/([a-zA-Z0-9_-]+\.)?vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
       // Allow onrender.com preview domains
       if (/^https:\/\/([a-zA-Z0-9_-]+\.)?onrender\.com$/.test(origin)) {
         return callback(null, true);
@@ -66,15 +71,33 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Database connection middleware to ensure connection on serverless invocations
+app.use(async (req, res, next) => {
+  // Allow health checks to proceed even if DB is connecting
+  if (req.path === "/api/health" || req.path === "/health") {
+    return next();
+  }
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("Database connection error on request:", err.message);
+    res.status(503).json({
+      success: false,
+      message: "Database connection failed. Please check MONGODB_URI environment variable."
+    });
+  }
+});
+
 // Health Check
-app.get("/api/health", (req, res) => {
+app.get(["/api/health", "/health"], (req, res) => {
   res.json({
     status: "ok",
     message: "FleetPulse API is running"
   });
 });
 
-app.get("/", (req, res) => {
+app.get(["/", "/api"], (req, res) => {
   res.json({
     name: "FleetPulse API Server",
     version: "1.0.0",
@@ -92,7 +115,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Mount Routes
+// Mount Routes (with /api prefix)
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
@@ -100,6 +123,15 @@ app.use("/api/spare-parts", sparePartRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reports", reportRoutes);
+
+// Also mount routes without /api prefix for serverless rewrite flexibility
+app.use("/vehicles", vehicleRoutes);
+app.use("/services", serviceRoutes);
+app.use("/maintenance", maintenanceRoutes);
+app.use("/spare-parts", sparePartRoutes);
+app.use("/expenses", expenseRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/reports", reportRoutes);
 
 // 404 Handler for undefined API routes
 app.use((req, res, next) => {
@@ -115,7 +147,12 @@ app.use((req, res, next) => {
 // Centralized Error Handler
 app.use(errorHandler);
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`FleetPulse server running at http://localhost:${PORT}`);
-});
+// Start Server if executed directly (e.g. local dev: node server.js)
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL && require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`FleetPulse server running at http://localhost:${PORT}`);
+  });
+}
+
+// Export app instance for Vercel Serverless Functions
+module.exports = app;
